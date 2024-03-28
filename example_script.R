@@ -1,11 +1,18 @@
 # Libraries
 library(sdeTMB)
+library(ggplot2)
+library(patchwork)
+library(dplyr)
+
+# Load SDE Package
+devtools::document("~/github/sdeTMB")
+devtools::load_all("~/github/sdeTMB")
 
 # Set File Location to Working Directory
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 # Load Data
-
+df = readRDS("example_data.rds")
 
 # Create Model
 model = sdeTMB$new()
@@ -29,9 +36,40 @@ model$add_parameters(
   logsigma_y  = log(5e-2)
 )
 model$add_inputs(Sf, Qr, Qf)
-
-# Load Data
-df = readRDS("example_data.rds")
-
-
 model$set_initial_state(mean=df$Sbh[1], cov=5e-2^2*diag(1))
+
+# Estimate Parameters
+fit = model$estimate(data=df, use.hessian=TRUE)
+
+# Full Predict (no state update)
+pred = model$predict(data=df, k.ahead=1e6)
+
+# PLOTTING
+# PLOTTING
+# PLOTTING
+
+# load ggplot theme and colors
+source("ggplot_settings.R")
+
+# Prediction plot with 95% confidence interval
+p1 = ggplot() + 
+  geom_ribbon(data=pred$states, aes(x=t.j, ymin=x-2*sqrt(var.x),ymax=x+2*sqrt(var.x)), fill="grey",alpha=0.75) + 
+  geom_line(data=pred$states, aes(x=t.j, y=x, color="Predictions")) + 
+  geom_point(data=pred$observations,aes(x=t.j, y=Sbh.data, color="Observations"), size=0.5) +
+  labs(color="",x="Time [Hours]", y="Sludge Blanket Height [Meters]") +
+  mytheme
+
+# Predicton plot for 2 and 4 hour predictions
+pred2 = model$predict(data=df, k.ahead=6*4, return.k.ahead=c(6*2,6*4))
+pred.2hours = pred2$states %>% filter(k.ahead==6*2)
+pred.4hours = pred2$states %>% filter(k.ahead==6*4)
+obs = pred2$observations %>% filter(k.ahead==6*4)
+p2 = ggplot() +
+  geom_line(data=pred.2hours, aes(x=t.j,y=x,color="2 Hour Prediction")) +
+  geom_line(data=pred.4hours, aes(x=t.j,y=x,color="4 Hour Prediction")) +
+  geom_point(data=obs, aes(x=t.j,y=Sbh.data,color="Observations"), size=0.5) +
+  labs(color="",x="Time [Hours]", y="Sludge Blanket Height [Meters]") +
+  mytheme
+
+# Wrap plots
+patchwork::wrap_plots(p1,p2,nrow=2)

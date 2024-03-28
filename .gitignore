@@ -1,2 +1,4 @@
 .DS_Store
 generate_example_data.R
+sdeTMB_cppfiles
+.Rhistory
