@@ -1,12 +1,11 @@
+# uncomment to install the sdeTMB package from GitHub
+# remotes::install_github(repo="phillipbvetter/sdeTMB", dependencies=TRUE)
+
 # Libraries
 library(sdeTMB)
 library(ggplot2)
 library(patchwork)
 library(dplyr)
-
-# Load SDE Package
-devtools::document("~/github/sdeTMB")
-devtools::load_all("~/github/sdeTMB")
 
 # Set File Location to Working Directory
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
