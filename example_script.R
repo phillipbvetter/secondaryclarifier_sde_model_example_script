@@ -1,8 +1,8 @@
 # uncomment to install the sdeTMB package from GitHub
-# remotes::install_github(repo="phillipbvetter/sdeTMB", dependencies=TRUE)
+# remotes::install_github(repo="phillipbvetter/ctsmTMB")
 
 # Libraries
-library(sdeTMB)
+library(ctsmTMB)
 library(ggplot2)
 library(patchwork)
 library(dplyr)
@@ -13,20 +13,23 @@ setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 # Load Data
 df = readRDS("example_data.rds")
 
-# Create Model
-model = sdeTMB$new()
-model$set_modelname("sbh_model")
-model$add_systems(dx ~ tau * (mu-x) * dt + sigma_x * dw1)
-model$add_observations(Sbh ~ x)
-model$add_observation_variances(Sbh ~ sigma_y^2)
+# Scale inputs to get parameters of similar size (better for optimization later)
+df <- df %>% mutate(Qf = Qf/1e2, Sf=Sf/1e2, Qr=Qr/1e2)
 
-model$add_algebraics(
+
+# Create Model
+model = ctsmTMB$new()
+model$addSystem(dx ~ tau * (mu-x) * dt + sigma_x * dw1)
+model$addObs(Sbh ~ x)
+model$setVariance(Sbh ~ sigma_y^2)
+
+model$setAlgebraics(
   tau ~ 1/exp(logtheta),
   mu ~ invlogit(b0 + b1*Qf*Sf + b2*Qr)*3.5,
   sigma_x ~ exp(logsigma_x),
   sigma_y ~ exp(logsigma_y)
 )
-model$add_parameters(
+model$setParameter(
   logtheta = log(c(1, 1/6, 24)),
   b0 = c(1e-5,-100,100),
   b1 = c(1e-5,-100,100),
@@ -34,14 +37,17 @@ model$add_parameters(
   logsigma_x = log(c(1e-2, 1e-10, 1)),
   logsigma_y  = log(5e-2)
 )
-model$add_inputs(Sf, Qr, Qf)
-model$set_initial_state(mean=df$Sbh[1], cov=5e-2^2*diag(1))
+model$addInput(Sf, Qr, Qf)
+model$setInitialState(list(mean=df$Sbh[1], cov=5e-2^2*diag(1)))
 
 # Estimate Parameters
-fit = model$estimate(data=df, use.hessian=TRUE)
+fit = model$estimate(data=df, report=FALSE)
 
 # Full Predict (no state update)
-pred = model$predict(data=df, k.ahead=1e6)
+pred = model$predict(data=df, use.cpp=TRUE)
+
+# Predicton plot for 2 and 4 hour predictions
+pred2 = model$predict(data=df, k.ahead=6*4, return.k.ahead=c(6*2, 6*4), use.cpp=TRUE)
 
 # PLOTTING
 # PLOTTING
@@ -59,10 +65,9 @@ p1 = ggplot() +
   mytheme
 
 # Predicton plot for 2 and 4 hour predictions
-pred2 = model$predict(data=df, k.ahead=6*4, return.k.ahead=c(6*2,6*4))
-pred.2hours = pred2$states %>% filter(k.ahead==6*2)
-pred.4hours = pred2$states %>% filter(k.ahead==6*4)
-obs = pred2$observations %>% filter(k.ahead==6*4)
+pred.2hours = pred2$states %>% dplyr::filter(k.ahead == 6*2)
+pred.4hours = pred2$states %>% dplyr::filter(k.ahead==6*4)
+obs = pred2$observations %>% dplyr::filter(k.ahead==6*4)
 p2 = ggplot() +
   geom_line(data=pred.2hours, aes(x=t.j,y=x,color="2 Hour Prediction")) +
   geom_line(data=pred.4hours, aes(x=t.j,y=x,color="4 Hour Prediction")) +
