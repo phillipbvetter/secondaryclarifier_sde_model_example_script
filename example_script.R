@@ -1,4 +1,4 @@
-# uncomment to install the sdeTMB package from GitHub
+# uncomment to install the ctsmTMB package from GitHub
 # remotes::install_github(repo="phillipbvetter/ctsmTMB")
 
 # Libraries
